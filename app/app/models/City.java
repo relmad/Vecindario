@@ -109,4 +109,17 @@ public class City extends Model
 		}
 	}
 	
+	/**
+	 * Return all the cities of the supplied province
+	 * @param province
+	 * @return
+	 */
+	public static List<City> getCitiesForProvince(Province province,int maxRows)
+	{
+		List<City> cities = City.find.select("cityName").where().eq("province", province).setMaxRows(maxRows).findList();
+		
+		return cities;
+	}
+
+	
 }

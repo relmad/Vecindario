@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 import models.CSDIndex;
+import models.City;
+import models.CityVacancy;
+import models.InvesterModel;
 import models.NewHousingPriceIndex;
 import models.Province;
 import models.RentalRate;
@@ -95,9 +98,81 @@ public class QueryApi extends Controller
 	}
 	
 	@BodyParser.Of(BodyParser.Json.class)
-	public static Result getInvestorResult()
+	public static Result getInvestorResult(final int scgcode)
 	{
-		return badRequest("{ \"result\" : \"failure\" ,\"message:\":\"This method is not implemented\"}");
+		// fetch the City's from the province
+		Province pr = Province.getProvinceById(scgcode);
+		
+		// get the cities
+		List<City> cities = City.getCitiesForProvince(pr,MAX_ROWS);
+		List<InvesterModel> investerModels = new ArrayList<InvesterModel>();
+		
+		if(cities !=null && cities.size() >0)
+		{	
+			for(City city: cities)				
+			{
+				// fetch the vacancy, rental rates and house pricing index for each city
+			    List<RentalRate> rentalRates = RentalRate.getRentalRateOnLocation(city,MAX_ROWS);
+			    
+			    if(rentalRates != null && !rentalRates.isEmpty())
+			    {
+			    	for(RentalRate rate:rentalRates)			    		
+			    	{
+			    		  InvesterModel investerModel = new InvesterModel();
+						  investerModel.cityName = city.cityName;
+						  investerModel.provinceAbr = city.province.abbreviation;
+						  investerModel.year = rate.referenceYear;
+						  investerModel.rentalRate = rate.rentalRate;
+						  investerModel.unitType =rate.unitType.abbreviation;
+						  investerModel.buildingType = rate.buildingType.abbreviation;
+				    	  CityVacancy vacancy = CityVacancy.getVacancyRateOnLocationAndYear(city,rate.referenceYear);	
+				    	 
+				    	  if(vacancy != null)
+				    	  {
+						     investerModel.vacancyRate = vacancy.vacancyRate;
+				    	  }
+						 
+				    	  List<NewHousingPriceIndex> houseIndexes = NewHousingPriceIndex.gethousePriceIndexOnyear(rate.referenceYear,city.cityId);
+				    	  investerModel.avgPriceIndex2007 = NewHousingPriceIndex.calculateYearlyAvgIndex(houseIndexes);
+				    	  
+				    	  investerModels.add(investerModel);
+			    	}
+			    }			    
+			}		     
+		}
+		
+		ObjectNode baseNode = null;
+		
+		if(investerModels != null && !investerModels.isEmpty())
+		{					
+			baseNode = buildSuccessResponseObject("Results for Invester Search");
+			baseNode.put("count", investerModels.size());
+			
+			List<ObjectNode> jsSequence = new ArrayList<ObjectNode>();
+			
+			for (InvesterModel iModel : investerModels)
+			{
+				ObjectNode csdNode = Json.newObject();
+				csdNode.put("year", iModel.year);
+				csdNode.put("rentalRate",iModel.rentalRate);
+				csdNode.put("vacancyRate", iModel.vacancyRate);
+				csdNode.put("city", iModel.cityName);
+				csdNode.put("province", iModel.provinceAbr);
+				csdNode.put("avgPriceIndex2007", iModel.avgPriceIndex2007);
+				csdNode.put("unitType", iModel.cityName);
+				csdNode.put("buildingType", iModel.provinceAbr);
+				jsSequence.add(csdNode);
+				
+			}
+			
+			baseNode.put("rows", Json.toJson(jsSequence));
+		}
+		else
+		{
+			baseNode = buildFailedResponseObject("No invester information is available");
+		}
+		
+		return ok(baseNode);
 	}
 	
 	@BodyParser.Of(BodyParser.Json.class)

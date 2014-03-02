@@ -15,6 +15,7 @@ import javax.persistence.JoinColumn;
 import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
+import com.avaje.ebean.Ebean;
 import com.avaje.ebean.FetchConfig;
 import com.avaje.ebean.Query;
 
@@ -121,5 +122,47 @@ public class NewHousingPriceIndex extends Model
 		}
 		
 		return (result / indexes.size())/100;
+	}
+
+	public static List<NewHousingPriceIndex> getNewHousePriceIndexOnLocation(City city) 
+	{		
+		 String strQuery = "find priceIndex where city=:ci and province:pr";
+		 Query<NewHousingPriceIndex> query = Ebean.createQuery(NewHousingPriceIndex.class, strQuery);
+		 query.setParameter("ci", city);
+		 query.setParameter("pr", city.province);
+		
+		 List<NewHousingPriceIndex> housingPriceIndexes = query.findList();
+		
+		return housingPriceIndexes;
+	}
+	
+	/**
+	 * Gets the db indexes for the specified year
+	 * @param year year
+	 * @param scgCode city id
+	 * @return list of indexes if found, empty list otherwise
+	 */
+	public static List<NewHousingPriceIndex> gethousePriceIndexOnyear(int year, int scgCode)
+	{
+		try 
+		{
+			Query<NewHousingPriceIndex> query = find.query().fetch("city", "*", new FetchConfig().query());
+			City.addScgCodeToQuery(query.where(), scgCode, scgCode, "city");	
+			Calendar cal = Calendar.getInstance();
+			cal.set(year, 1, 1);
+			long startTime = cal.getTime().getTime();
+			cal.set(year, 12, 31);
+			long endTime = cal.getTime().getTime();
+			query.where().in("referenceDate", new Date(startTime), new Date(endTime));
+			List<NewHousingPriceIndex> result = query.findList();
+			return result;
+			
+		}
+		catch (Exception e) 
+		{
+			Logger.error("", e);
+		}
+		
+		return new ArrayList<NewHousingPriceIndex>();
 	}
 }
